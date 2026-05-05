@@ -1,0 +1,258 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useGoogleMaps } from '@/hooks/useGoogleMaps';
+import { useCars } from '@/hooks/useCars';
+import { useTrips } from '@/hooks/useTrips';
+import { calculateRoute } from '@/lib/google-maps';
+import { calculateFuelCost, calculateTollCost } from '@/lib/calculations';
+import WaypointList from '@/components/WaypointList';
+import TollSegmentList from '@/components/TollSegmentList';
+import ResultCard from '@/components/ResultCard';
+import type { WaypointInput, TollSegmentInput, CalculationResult } from '@/types';
+
+const GAS_PRESETS = [155, 165, 175, 185];
+
+function uuid() {
+  return Math.random().toString(36).slice(2);
+}
+
+export default function HomePage() {
+  const { isLoaded, error: mapsError } = useGoogleMaps();
+  const { cars } = useCars();
+  const { saveTrip } = useTrips();
+
+  const [waypoints, setWaypoints] = useState<WaypointInput[]>([
+    { tempId: uuid(), place_name: '' },
+    { tempId: uuid(), place_name: '' },
+  ]);
+  const [selectedCarId, setSelectedCarId] = useState('');
+  const [gasPrice, setGasPrice] = useState(175);
+  const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
+  const [result, setResult] = useState<CalculationResult | null>(null);
+  const [tripName, setTripName] = useState('');
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState(false);
+
+  const selectedCar = cars.find((c) => c.id === selectedCarId);
+
+  const updateWaypoint = useCallback((tempId: string, updates: Partial<WaypointInput>) => {
+    setWaypoints((prev) =>
+      prev.map((wp) => (wp.tempId === tempId ? { ...wp, ...updates } : wp))
+    );
+    setResult(null);
+  }, []);
+
+  const addWaypoint = useCallback(() => {
+    setWaypoints((prev) => [
+      ...prev.slice(0, -1),
+      { tempId: uuid(), place_name: '' },
+      prev[prev.length - 1],
+    ]);
+  }, []);
+
+  const removeWaypoint = useCallback((tempId: string) => {
+    setWaypoints((prev) => prev.filter((wp) => wp.tempId !== tempId));
+    setResult(null);
+  }, []);
+
+  const addTollSegment = () => {
+    setTollSegments((prev) => [...prev, { tempId: uuid(), from_ic: '', to_ic: '', amount: 0 }]);
+  };
+
+  const removeTollSegment = (tempId: string) => {
+    setTollSegments((prev) => prev.filter((s) => s.tempId !== tempId));
+  };
+
+  const updateTollSegment = (tempId: string, updates: Partial<TollSegmentInput>) => {
+    setTollSegments((prev) => prev.map((s) => (s.tempId === tempId ? { ...s, ...updates } : s)));
+  };
+
+  const handleCalculate = async () => {
+    setError(null);
+
+    const filledWaypoints = waypoints.filter((wp) => wp.place_name.trim());
+    if (filledWaypoints.length < 2) {
+      setError('出発地と目的地を入力してください');
+      return;
+    }
+    if (!selectedCar) {
+      setError('使用する車を選択してください');
+      return;
+    }
+    if (!gasPrice || gasPrice <= 0) {
+      setError('ガソリン単価を入力してください');
+      return;
+    }
+
+    setIsCalculating(true);
+    try {
+      const { segmentDistances, totalKm } = await calculateRoute(filledWaypoints);
+
+      setWaypoints((prev) =>
+        prev.map((wp, i) => ({
+          ...wp,
+          distance_from_prev_km: i === 0 ? undefined : segmentDistances[i - 1],
+        }))
+      );
+
+      const fuelCost = calculateFuelCost(totalKm, selectedCar.fuel_efficiency, gasPrice);
+      const tollCost = calculateTollCost(tollSegments);
+
+      setResult({
+        totalDistanceKm: totalKm,
+        fuelCost,
+        tollCost,
+        totalCost: fuelCost + tollCost,
+        segmentDistances,
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'ルート計算に失敗しました');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!result || !selectedCar) return;
+    setIsSaving(true);
+    try {
+      await saveTrip({
+        name: tripName,
+        totalDistanceKm: result.totalDistanceKm,
+        fuelCost: result.fuelCost,
+        tollCost: result.tollCost,
+        totalCost: result.totalCost,
+        gasPricePerLiter: gasPrice,
+        carName: selectedCar.name,
+        fuelEfficiency: selectedCar.fuel_efficiency,
+        waypoints,
+        tollSegments,
+        segmentDistances: result.segmentDistances,
+      });
+      setSavedMessage(true);
+      setTimeout(() => setSavedMessage(false), 3000);
+      setTripName('');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="pt-2">
+        <h1 className="text-lg font-bold text-gray-800">⛽ ガソリン代計算</h1>
+        {mapsError && (
+          <p className="text-xs text-red-500 mt-1">地図エラー: {mapsError}</p>
+        )}
+      </div>
+
+      {savedMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm text-center">
+          ✅ 保存しました！
+        </div>
+      )}
+
+      <WaypointList
+        waypoints={waypoints}
+        isLoaded={isLoaded}
+        onUpdate={updateWaypoint}
+        onAdd={addWaypoint}
+        onRemove={removeWaypoint}
+      />
+
+      {/* 車選択 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h2 className="font-semibold text-gray-800 text-sm">🚗 使用する車</h2>
+        {cars.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            車が登録されていません。
+            <a href="/cars" className="text-blue-600 underline ml-1">車登録ページ</a>で追加してください。
+          </p>
+        ) : (
+          <select
+            value={selectedCarId}
+            onChange={(e) => setSelectedCarId(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="">車を選択してください</option>
+            {cars.map((car) => (
+              <option key={car.id} value={car.id}>
+                {car.name}（{car.fuel_efficiency} km/L）
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* ガソリン単価 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h2 className="font-semibold text-gray-800 text-sm">💴 ガソリン単価</h2>
+        <div className="relative">
+          <input
+            type="number"
+            value={gasPrice}
+            onChange={(e) => setGasPrice(parseInt(e.target.value) || 0)}
+            min="100"
+            max="300"
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">円/L</span>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {GAS_PRESETS.map((price) => (
+            <button
+              key={price}
+              onClick={() => setGasPrice(price)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                gasPrice === price
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {price}円
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <TollSegmentList
+        segments={tollSegments}
+        onAdd={addTollSegment}
+        onRemove={removeTollSegment}
+        onUpdate={updateTollSegment}
+      />
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={handleCalculate}
+        disabled={isCalculating || !isLoaded}
+        className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold rounded-xl text-base transition-colors shadow-sm"
+      >
+        {isCalculating ? '⏳ 計算中...' : isLoaded ? '⛽ ガソリン代を計算する' : '🗺️ 地図を読み込み中...'}
+      </button>
+
+      {result && selectedCar && (
+        <ResultCard
+          result={result}
+          waypoints={waypoints}
+          carName={selectedCar.name}
+          gasPrice={gasPrice}
+          tripName={tripName}
+          onTripNameChange={setTripName}
+          onSave={handleSave}
+          isSaving={isSaving}
+        />
+      )}
+    </div>
+  );
+}
