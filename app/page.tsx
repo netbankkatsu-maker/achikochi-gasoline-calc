@@ -26,6 +26,8 @@ export default function HomePage() {
     { tempId: uuid(), place_name: '' },
     { tempId: uuid(), place_name: '' },
   ]);
+  // Filled waypoints used for the last calculation (matches segmentDistances indices)
+  const [resultWaypoints, setResultWaypoints] = useState<WaypointInput[]>([]);
   const [selectedCarId, setSelectedCarId] = useState('');
   const [gasPrice, setGasPrice] = useState(175);
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
@@ -51,6 +53,7 @@ export default function HomePage() {
       { tempId: uuid(), place_name: '' },
       prev[prev.length - 1],
     ]);
+    setResult(null);
   }, []);
 
   const removeWaypoint = useCallback((tempId: string) => {
@@ -91,12 +94,20 @@ export default function HomePage() {
     try {
       const { segmentDistances, totalKm } = await calculateRoute(filledWaypoints);
 
+      // Map distances back by tempId so empty/skipped waypoints don't shift indices
+      const distanceMap = new Map<string, number | undefined>();
+      filledWaypoints.forEach((wp, i) => {
+        distanceMap.set(wp.tempId, i === 0 ? undefined : segmentDistances[i - 1]);
+      });
       setWaypoints((prev) =>
-        prev.map((wp, i) => ({
+        prev.map((wp) => ({
           ...wp,
-          distance_from_prev_km: i === 0 ? undefined : segmentDistances[i - 1],
+          distance_from_prev_km: distanceMap.get(wp.tempId),
         }))
       );
+
+      // Store the filled waypoints so ResultCard and saveTrip use the correct ordering
+      setResultWaypoints(filledWaypoints);
 
       const fuelCost = calculateFuelCost(totalKm, selectedCar.fuel_efficiency, gasPrice);
       const tollCost = calculateTollCost(tollSegments);
@@ -128,7 +139,7 @@ export default function HomePage() {
         gasPricePerLiter: gasPrice,
         carName: selectedCar.name,
         fuelEfficiency: selectedCar.fuel_efficiency,
-        waypoints,
+        waypoints: resultWaypoints, // use filled waypoints that align with segmentDistances
         tollSegments,
         segmentDistances: result.segmentDistances,
       });
@@ -244,7 +255,7 @@ export default function HomePage() {
       {result && selectedCar && (
         <ResultCard
           result={result}
-          waypoints={waypoints}
+          waypoints={resultWaypoints}
           carName={selectedCar.name}
           gasPrice={gasPrice}
           tripName={tripName}

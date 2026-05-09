@@ -1,17 +1,23 @@
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 import type { WaypointInput } from '@/types';
 
-let mapsLoaded = false;
+// Cache the in-flight promise so concurrent callers all await the same load
+let loadPromise: Promise<void> | null = null;
 
 export async function loadGoogleMaps(): Promise<void> {
-  if (mapsLoaded) return;
-  setOptions({
-    key: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
-    v: 'weekly',
-  });
-  await importLibrary('maps');
-  await importLibrary('places');
-  mapsLoaded = true;
+  if (!loadPromise) {
+    loadPromise = (async () => {
+      setOptions({
+        key: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+        v: 'weekly',
+        language: 'ja',
+        region: 'JP',
+      });
+      await importLibrary('maps');
+      await importLibrary('places');
+    })();
+  }
+  return loadPromise;
 }
 
 export async function calculateRoute(
