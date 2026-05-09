@@ -124,7 +124,7 @@ export default function HomePage() {
       setResultWaypoints(filledWaypoints);
 
       const fuelCost = calculateFuelCost(totalKm, selectedCar.fuel_efficiency, gasPrice);
-      const tollCost = calculateTollCost(tollSegments);
+      const tollCost = avoidTolls ? 0 : calculateTollCost(tollSegments);
 
       setResult({
         totalDistanceKm: totalKm,
@@ -248,6 +248,16 @@ export default function HomePage() {
         onToggleAvoidTolls={() => { setAvoidTolls((v) => !v); setResult(null); }}
       />
 
+      {/* 高速料金 — 下道のみの場合は非表示 */}
+      {!avoidTolls && (
+        <TollSegmentList
+          segments={tollSegments}
+          onAdd={addTollSegment}
+          onRemove={removeTollSegment}
+          onUpdate={updateTollSegment}
+        />
+      )}
+
       {/* 車選択 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
         <h2 className="font-semibold text-gray-800 text-sm">🚗 使用する車</h2>
@@ -302,13 +312,6 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-
-      <TollSegmentList
-        segments={tollSegments}
-        onAdd={addTollSegment}
-        onRemove={removeTollSegment}
-        onUpdate={updateTollSegment}
-      />
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
