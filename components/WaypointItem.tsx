@@ -12,7 +12,10 @@ type Props = {
   isDragOver: boolean;
   onUpdate: (tempId: string, updates: Partial<WaypointInput>) => void;
   onRemove: (tempId: string) => void;
-  onGripPointerDown: () => void;
+  // Pointer events forwarded from WaypointList (pointer capture lives on the grip)
+  onGripPointerDown: (e: React.PointerEvent) => void;
+  onGripPointerMove: (e: React.PointerEvent) => void;
+  onGripPointerUp: (e: React.PointerEvent) => void;
 };
 
 function getLabel(index: number, total: number) {
@@ -22,15 +25,10 @@ function getLabel(index: number, total: number) {
 }
 
 export default function WaypointItem({
-  waypoint,
-  index,
-  total,
-  isLoaded,
-  isDragging,
-  isDragOver,
-  onUpdate,
-  onRemove,
-  onGripPointerDown,
+  waypoint, index, total, isLoaded,
+  isDragging, isDragOver,
+  onUpdate, onRemove,
+  onGripPointerDown, onGripPointerMove, onGripPointerUp,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
@@ -80,21 +78,24 @@ export default function WaypointItem({
 
   return (
     <div
-      className={`flex items-center gap-2 rounded-lg transition-colors ${
+      className={`flex items-center gap-2 rounded-lg transition-all duration-150 ${
         isDragOver ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : ''
-      } ${isDragging ? 'opacity-40' : ''}`}
+      } ${isDragging ? 'opacity-40 scale-95' : ''}`}
     >
-      {/* ドラッグハンドル */}
+      {/* ドラッグハンドル — touch-none で慣性スクロールと競合しない */}
       <div
         onPointerDown={onGripPointerDown}
-        className="flex-shrink-0 w-5 flex justify-center cursor-grab active:cursor-grabbing touch-none select-none text-gray-300 hover:text-gray-500 transition-colors"
+        onPointerMove={onGripPointerMove}
+        onPointerUp={onGripPointerUp}
+        onPointerCancel={onGripPointerUp}
+        className="flex-shrink-0 w-5 flex justify-center touch-none select-none cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors py-2"
         aria-label="ドラッグして並び替え"
       >
         <svg viewBox="0 0 10 16" fill="currentColor" className="w-3 h-4">
-          <circle cx="2.5" cy="2" r="1.5" />
-          <circle cx="7.5" cy="2" r="1.5" />
-          <circle cx="2.5" cy="6" r="1.5" />
-          <circle cx="7.5" cy="6" r="1.5" />
+          <circle cx="2.5" cy="2"  r="1.5" />
+          <circle cx="7.5" cy="2"  r="1.5" />
+          <circle cx="2.5" cy="6"  r="1.5" />
+          <circle cx="7.5" cy="6"  r="1.5" />
           <circle cx="2.5" cy="10" r="1.5" />
           <circle cx="7.5" cy="10" r="1.5" />
           <circle cx="2.5" cy="14" r="1.5" />

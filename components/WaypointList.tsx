@@ -16,40 +16,42 @@ type Props = {
 export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onRemove, onReorder }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
-  // gripPressed tracks whether the drag started from the grip handle
-  const gripPressedRef = useRef(false);
 
-  const handleDragStart = (e: React.DragEvent, tempId: string) => {
-    if (!gripPressedRef.current) {
-      e.preventDefault();
-      return;
-    }
+  // Each row's DOM element, keyed by tempId
+  const rowRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+
+  // Called when the grip handle fires pointerdown → start capture
+  const handleGripPointerDown = (tempId: string) => (e: React.PointerEvent) => {
+    e.preventDefault(); // prevent text selection / page scroll
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setDraggingId(tempId);
-    e.dataTransfer.effectAllowed = 'move';
-    // ドラッグ中のゴースト画像を少し透過させる
-    e.dataTransfer.setDragImage(e.currentTarget as HTMLElement, 20, 20);
+    setDragOverId(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, tempId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverId !== tempId) setDragOverId(tempId);
+  // While captured, pointermove fires only on the grip that captured it.
+  // Use elementFromPoint to find which row is under the pointer.
+  const handleGripPointerMove = (e: React.PointerEvent) => {
+    if (!draggingId) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+
+    for (const [id, rowEl] of rowRefs.current) {
+      if (id !== draggingId && rowEl && rowEl.contains(el)) {
+        if (dragOverId !== id) setDragOverId(id);
+        return;
+      }
+    }
+    setDragOverId(null);
   };
 
-  const handleDrop = (e: React.DragEvent, toTempId: string) => {
-    e.preventDefault();
-    if (draggingId && draggingId !== toTempId) {
-      onReorder(draggingId, toTempId);
+  // Release → perform reorder
+  const handleGripPointerUp = (e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    if (draggingId && dragOverId && draggingId !== dragOverId) {
+      onReorder(draggingId, dragOverId);
     }
     setDraggingId(null);
     setDragOverId(null);
-    gripPressedRef.current = false;
-  };
-
-  const handleDragEnd = () => {
-    setDraggingId(null);
-    setDragOverId(null);
-    gripPressedRef.current = false;
   };
 
   return (
@@ -61,7 +63,10 @@ export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onR
 
       <div className="space-y-1">
         {waypoints.map((wp, i) => (
-          <div key={wp.tempId}>
+          <div
+            key={wp.tempId}
+            ref={(el) => { rowRefs.current.set(wp.tempId, el); }}
+          >
             {i > 0 && (
               <div className="flex items-center gap-2 py-0.5 pl-5">
                 <div className="w-6 flex justify-center">
@@ -72,27 +77,19 @@ export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onR
                 )}
               </div>
             )}
-            <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, wp.tempId)}
-              onDragOver={(e) => handleDragOver(e, wp.tempId)}
-              onDragLeave={() => setDragOverId(null)}
-              onDrop={(e) => handleDrop(e, wp.tempId)}
-              onDragEnd={handleDragEnd}
-              className="rounded-lg"
-            >
-              <WaypointItem
-                waypoint={wp}
-                index={i}
-                total={waypoints.length}
-                isLoaded={isLoaded}
-                isDragging={draggingId === wp.tempId}
-                isDragOver={dragOverId === wp.tempId && draggingId !== wp.tempId}
-                onUpdate={onUpdate}
-                onRemove={onRemove}
-                onGripPointerDown={() => { gripPressedRef.current = true; }}
-              />
-            </div>
+            <WaypointItem
+              waypoint={wp}
+              index={i}
+              total={waypoints.length}
+              isLoaded={isLoaded}
+              isDragging={draggingId === wp.tempId}
+              isDragOver={dragOverId === wp.tempId && draggingId !== wp.tempId}
+              onUpdate={onUpdate}
+              onRemove={onRemove}
+              onGripPointerDown={handleGripPointerDown(wp.tempId)}
+              onGripPointerMove={handleGripPointerMove}
+              onGripPointerUp={handleGripPointerUp}
+            />
           </div>
         ))}
       </div>
