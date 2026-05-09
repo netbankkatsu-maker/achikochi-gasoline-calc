@@ -30,6 +30,7 @@ export default function HomePage() {
   const [resultWaypoints, setResultWaypoints] = useState<WaypointInput[]>([]);
   const [selectedCarId, setSelectedCarId] = useState('');
   const [gasPrice, setGasPrice] = useState(175);
+  const [avoidTolls, setAvoidTolls] = useState(false);
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [tripName, setTripName] = useState('');
@@ -105,7 +106,7 @@ export default function HomePage() {
 
     setIsCalculating(true);
     try {
-      const { segmentDistances, totalKm } = await calculateRoute(filledWaypoints);
+      const { segmentDistances, totalKm } = await calculateRoute(filledWaypoints, { avoidTolls });
 
       // Map distances back by tempId so empty/skipped waypoints don't shift indices
       const distanceMap = new Map<string, number | undefined>();
@@ -239,10 +240,12 @@ export default function HomePage() {
       <WaypointList
         waypoints={waypoints}
         isLoaded={isLoaded}
+        avoidTolls={avoidTolls}
         onUpdate={updateWaypoint}
         onAdd={addWaypoint}
         onRemove={removeWaypoint}
         onReorder={reorderWaypoints}
+        onToggleAvoidTolls={() => { setAvoidTolls((v) => !v); setResult(null); }}
       />
 
       {/* 車選択 */}

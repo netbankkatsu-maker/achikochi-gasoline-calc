@@ -7,13 +7,15 @@ import WaypointItem from './WaypointItem';
 type Props = {
   waypoints: WaypointInput[];
   isLoaded: boolean;
+  avoidTolls: boolean;
   onUpdate: (tempId: string, updates: Partial<WaypointInput>) => void;
   onAdd: () => void;
   onRemove: (tempId: string) => void;
   onReorder: (fromTempId: string, toTempId: string) => void;
+  onToggleAvoidTolls: () => void;
 };
 
-export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onRemove, onReorder }: Props) {
+export default function WaypointList({ waypoints, isLoaded, avoidTolls, onUpdate, onAdd, onRemove, onReorder, onToggleAvoidTolls }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -103,6 +105,43 @@ export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onR
         </svg>
         経由地を追加
       </button>
+
+      {/* ルート種別 */}
+      <div className="border-t border-gray-100 pt-3">
+        <p className="text-xs text-gray-500 mb-2">ルートの種類</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => avoidTolls && onToggleAvoidTolls()}
+            className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${
+              !avoidTolls
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            🛣️ 通常（高速あり）
+          </button>
+          <button
+            onClick={() => !avoidTolls && onToggleAvoidTolls()}
+            className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${
+              avoidTolls
+                ? 'bg-green-600 text-white border-green-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            🏘️ 下道のみ
+          </button>
+        </div>
+        {avoidTolls && (
+          <p className="text-xs text-gray-400 mt-1.5">
+            高速を使わないルートで距離を計算します
+          </p>
+        )}
+        {!avoidTolls && (
+          <p className="text-xs text-gray-400 mt-1.5">
+            途中から高速に乗る場合は経由地に「乗った場所」を追加してください
+          </p>
+        )}
+      </div>
     </div>
   );
 }

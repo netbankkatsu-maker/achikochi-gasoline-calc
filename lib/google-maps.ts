@@ -77,7 +77,8 @@ export async function loadGoogleMaps(): Promise<void> {
 }
 
 export async function calculateRoute(
-  waypoints: WaypointInput[]
+  waypoints: WaypointInput[],
+  options?: { avoidTolls?: boolean }
 ): Promise<{ segmentDistances: number[]; totalKm: number }> {
   if (waypoints.length < 2) {
     throw new Error('2地点以上入力してください');
@@ -102,6 +103,7 @@ export async function calculateRoute(
     optimizeWaypoints: false,
     travelMode: google.maps.TravelMode.DRIVING,
     region: 'jp',
+    avoidTolls: options?.avoidTolls ?? false,
   });
 
   const legs = result.routes[0].legs;
