@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
 import { useCars } from '@/hooks/useCars';
 import { useTrips } from '@/hooks/useTrips';
-import { calculateRoute } from '@/lib/google-maps';
+import { calculateRoute, estimateRouteToll } from '@/lib/google-maps';
 import { calculateFuelCost, calculateTollCost } from '@/lib/calculations';
 import WaypointList from '@/components/WaypointList';
 import TollSegmentList from '@/components/TollSegmentList';
@@ -33,6 +33,8 @@ export default function HomePage() {
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [tripName, setTripName] = useState('');
+  const [googleTollEstimate, setGoogleTollEstimate] = useState<number | null>(null);
+  const [isEstimatingToll, setIsEstimatingToll] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,13 @@ export default function HomePage() {
     setTollSegments((prev) => [...prev, { tempId: uuid(), from_ic: '', to_ic: '', amount: 0 }]);
   };
 
+  const addTollFromGoogleEstimate = (amount: number) => {
+    setTollSegments((prev) => [
+      ...prev,
+      { tempId: uuid(), from_ic: '自動検出', to_ic: '自動検出', amount },
+    ]);
+  };
+
   const removeTollSegment = (tempId: string) => {
     setTollSegments((prev) => prev.filter((s) => s.tempId !== tempId));
   };
@@ -88,6 +97,7 @@ export default function HomePage() {
 
   const handleCalculate = async () => {
     setError(null);
+    setGoogleTollEstimate(null);
 
     const filledWaypoints = waypoints.filter((wp) => wp.place_name.trim());
     if (filledWaypoints.length < 2) {
@@ -104,8 +114,16 @@ export default function HomePage() {
     }
 
     setIsCalculating(true);
+    setIsEstimatingToll(true);
     try {
-      const { segmentDistances, totalKm } = await calculateRoute(filledWaypoints);
+      // ルート計算と高速料金推定を並行実行
+      const [routeResult, tollEstimate] = await Promise.all([
+        calculateRoute(filledWaypoints),
+        estimateRouteToll(filledWaypoints),
+      ]);
+
+      const { segmentDistances, totalKm } = routeResult;
+      setGoogleTollEstimate(tollEstimate);
 
       // Map distances back by tempId so empty/skipped waypoints don't shift indices
       const distanceMap = new Map<string, number | undefined>();
@@ -136,6 +154,7 @@ export default function HomePage() {
       setError(e instanceof Error ? e.message : 'ルート計算に失敗しました');
     } finally {
       setIsCalculating(false);
+      setIsEstimatingToll(false);
     }
   };
 
@@ -305,6 +324,9 @@ export default function HomePage() {
         onAdd={addTollSegment}
         onRemove={removeTollSegment}
         onUpdate={updateTollSegment}
+        googleTollEstimate={googleTollEstimate}
+        isEstimatingToll={isEstimatingToll}
+        onAddFromEstimate={addTollFromGoogleEstimate}
       />
 
       {error && (
