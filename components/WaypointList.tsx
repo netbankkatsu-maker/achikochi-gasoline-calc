@@ -9,9 +9,11 @@ type Props = {
   onUpdate: (tempId: string, updates: Partial<WaypointInput>) => void;
   onAdd: () => void;
   onRemove: (tempId: string) => void;
+  onMoveUp: (tempId: string) => void;
+  onMoveDown: (tempId: string) => void;
 };
 
-export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onRemove }: Props) {
+export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onRemove, onMoveUp, onMoveDown }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -39,6 +41,8 @@ export default function WaypointList({ waypoints, isLoaded, onUpdate, onAdd, onR
               isLoaded={isLoaded}
               onUpdate={onUpdate}
               onRemove={onRemove}
+              onMoveUp={onMoveUp}
+              onMoveDown={onMoveDown}
             />
           </div>
         ))}

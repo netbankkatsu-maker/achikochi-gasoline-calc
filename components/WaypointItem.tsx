@@ -10,6 +10,8 @@ type Props = {
   isLoaded: boolean;
   onUpdate: (tempId: string, updates: Partial<WaypointInput>) => void;
   onRemove: (tempId: string) => void;
+  onMoveUp: (tempId: string) => void;
+  onMoveDown: (tempId: string) => void;
 };
 
 function getLabel(index: number, total: number) {
@@ -18,7 +20,7 @@ function getLabel(index: number, total: number) {
   return `経由地 ${index}`;
 }
 
-export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdate, onRemove }: Props) {
+export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdate, onRemove, onMoveUp, onMoveDown }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
   // Use refs so the event handler always sees the latest values without recreating the element
@@ -71,11 +73,36 @@ export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdat
 
   return (
     <div className="flex items-center gap-2">
+      {/* 番号バッジ */}
       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
         {index + 1}
       </div>
       {/* PlaceAutocompleteElement is appended here as a real DOM node */}
       <div className="flex-1" ref={containerRef} />
+      {/* 並び替えボタン */}
+      <div className="flex-shrink-0 flex flex-col gap-0.5">
+        <button
+          onClick={() => onMoveUp(waypoint.tempId)}
+          disabled={index === 0}
+          className="w-6 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+          aria-label="上に移動"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+          </svg>
+        </button>
+        <button
+          onClick={() => onMoveDown(waypoint.tempId)}
+          disabled={index === total - 1}
+          className="w-6 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+          aria-label="下に移動"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      </div>
+      {/* 削除ボタン */}
       {canRemove ? (
         <button
           onClick={() => onRemove(waypoint.tempId)}

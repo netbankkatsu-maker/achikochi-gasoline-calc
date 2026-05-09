@@ -12,6 +12,7 @@ type Props = {
   onTripNameChange: (name: string) => void;
   onSave: () => void;
   isSaving: boolean;
+  onExport: () => void;
 };
 
 export default function ResultCard({
@@ -23,6 +24,7 @@ export default function ResultCard({
   onTripNameChange,
   onSave,
   isSaving,
+  onExport,
 }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -71,7 +73,7 @@ export default function ResultCard({
           <span className="text-2xl font-bold text-blue-600">{formatCurrency(result.totalCost)}</span>
         </div>
 
-        {/* 保存 */}
+        {/* 保存・出力 */}
         <div className="space-y-2 pt-2 border-t border-gray-100">
           <input
             type="text"
@@ -86,6 +88,12 @@ export default function ResultCard({
             className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm transition-colors"
           >
             {isSaving ? '保存中...' : '💾 この結果を保存する'}
+          </button>
+          <button
+            onClick={onExport}
+            className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 font-semibold rounded-lg text-sm transition-colors"
+          >
+            📊 Excelで出力する（CSV）
           </button>
         </div>
       </div>
