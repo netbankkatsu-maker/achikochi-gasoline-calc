@@ -8,10 +8,11 @@ type Props = {
   index: number;
   total: number;
   isLoaded: boolean;
+  isDragging: boolean;
+  isDragOver: boolean;
   onUpdate: (tempId: string, updates: Partial<WaypointInput>) => void;
   onRemove: (tempId: string) => void;
-  onMoveUp: (tempId: string) => void;
-  onMoveDown: (tempId: string) => void;
+  onGripPointerDown: () => void;
 };
 
 function getLabel(index: number, total: number) {
@@ -20,16 +21,24 @@ function getLabel(index: number, total: number) {
   return `経由地 ${index}`;
 }
 
-export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdate, onRemove, onMoveUp, onMoveDown }: Props) {
+export default function WaypointItem({
+  waypoint,
+  index,
+  total,
+  isLoaded,
+  isDragging,
+  isDragOver,
+  onUpdate,
+  onRemove,
+  onGripPointerDown,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
-  // Use refs so the event handler always sees the latest values without recreating the element
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const tempIdRef = useRef(waypoint.tempId);
   tempIdRef.current = waypoint.tempId;
 
-  // Create PlaceAutocompleteElement once when the Maps SDK becomes ready
   useEffect(() => {
     if (!isLoaded || !containerRef.current || elementRef.current) return;
 
@@ -41,7 +50,6 @@ export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdat
     el.setAttribute('placeholder', getLabel(index, total));
     el.style.width = '100%';
 
-    // Typed as EventListener (Event base type) so removeEventListener also accepts it
     const handleSelect: EventListener = (event) => {
       const { placePrediction } = event as google.maps.places.PlacePredictionSelectEvent;
       const place = placePrediction.toPlace();
@@ -62,9 +70,8 @@ export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdat
       el.remove();
       elementRef.current = null;
     };
-  }, [isLoaded]); // Only (re)create when load state changes; not on every render
+  }, [isLoaded]);
 
-  // Update placeholder text when position changes without recreating the element
   useEffect(() => {
     elementRef.current?.setAttribute('placeholder', getLabel(index, total));
   }, [index, total]);
@@ -72,36 +79,37 @@ export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdat
   const canRemove = total > 2;
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className={`flex items-center gap-2 rounded-lg transition-colors ${
+        isDragOver ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : ''
+      } ${isDragging ? 'opacity-40' : ''}`}
+    >
+      {/* ドラッグハンドル */}
+      <div
+        onPointerDown={onGripPointerDown}
+        className="flex-shrink-0 w-5 flex justify-center cursor-grab active:cursor-grabbing touch-none select-none text-gray-300 hover:text-gray-500 transition-colors"
+        aria-label="ドラッグして並び替え"
+      >
+        <svg viewBox="0 0 10 16" fill="currentColor" className="w-3 h-4">
+          <circle cx="2.5" cy="2" r="1.5" />
+          <circle cx="7.5" cy="2" r="1.5" />
+          <circle cx="2.5" cy="6" r="1.5" />
+          <circle cx="7.5" cy="6" r="1.5" />
+          <circle cx="2.5" cy="10" r="1.5" />
+          <circle cx="7.5" cy="10" r="1.5" />
+          <circle cx="2.5" cy="14" r="1.5" />
+          <circle cx="7.5" cy="14" r="1.5" />
+        </svg>
+      </div>
+
       {/* 番号バッジ */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
+      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
         {index + 1}
       </div>
-      {/* PlaceAutocompleteElement is appended here as a real DOM node */}
-      <div className="flex-1" ref={containerRef} />
-      {/* 並び替えボタン */}
-      <div className="flex-shrink-0 flex flex-col gap-0.5">
-        <button
-          onClick={() => onMoveUp(waypoint.tempId)}
-          disabled={index === 0}
-          className="w-6 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          aria-label="上に移動"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-          </svg>
-        </button>
-        <button
-          onClick={() => onMoveDown(waypoint.tempId)}
-          disabled={index === total - 1}
-          className="w-6 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          aria-label="下に移動"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-      </div>
+
+      {/* PlaceAutocompleteElement はここに DOM ノードとして追加される */}
+      <div className="flex-1 min-w-0" ref={containerRef} />
+
       {/* 削除ボタン */}
       {canRemove ? (
         <button

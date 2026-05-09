@@ -61,14 +61,14 @@ export default function HomePage() {
     setResult(null);
   }, []);
 
-  const moveWaypoint = useCallback((tempId: string, direction: 'up' | 'down') => {
+  const reorderWaypoints = useCallback((fromTempId: string, toTempId: string) => {
     setWaypoints((prev) => {
-      const idx = prev.findIndex((wp) => wp.tempId === tempId);
-      if (idx === -1) return prev;
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const fromIdx = prev.findIndex((wp) => wp.tempId === fromTempId);
+      const toIdx = prev.findIndex((wp) => wp.tempId === toTempId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
       const next = [...prev];
-      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+      const [removed] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, removed);
       return next;
     });
     setResult(null);
@@ -242,8 +242,7 @@ export default function HomePage() {
         onUpdate={updateWaypoint}
         onAdd={addWaypoint}
         onRemove={removeWaypoint}
-        onMoveUp={(tempId) => moveWaypoint(tempId, 'up')}
-        onMoveDown={(tempId) => moveWaypoint(tempId, 'down')}
+        onReorder={reorderWaypoints}
       />
 
       {/* 車選択 */}
