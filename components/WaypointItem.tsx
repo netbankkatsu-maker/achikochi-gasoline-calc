@@ -39,8 +39,10 @@ export default function WaypointItem({ waypoint, index, total, isLoaded, onUpdat
     el.setAttribute('placeholder', getLabel(index, total));
     el.style.width = '100%';
 
-    const handleSelect = (event: google.maps.places.PlacePredictionSelectEvent) => {
-      const place = event.placePrediction.toPlace();
+    // Typed as EventListener (Event base type) so removeEventListener also accepts it
+    const handleSelect: EventListener = (event) => {
+      const { placePrediction } = event as google.maps.places.PlacePredictionSelectEvent;
+      const place = placePrediction.toPlace();
       void place.fetchFields({ fields: ['formattedAddress', 'displayName'] }).then(() => {
         onUpdateRef.current(tempIdRef.current, {
           place_name: place.formattedAddress ?? place.displayName ?? '',
