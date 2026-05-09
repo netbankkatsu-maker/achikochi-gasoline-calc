@@ -8,32 +8,21 @@ const tabs = [
     href: '/',
     label: '計算',
     icon: (active: boolean) => (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <rect x="4" y="2" width="16" height="20" rx="2" />
-        <line x1="8" y1="8" x2="16" y2="8" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-        <line x1="8" y1="16" x2="12" y2="16" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+        <path d="M4 4h16v4H4z" />
+        <path d="M4 12h4v8H4zM10 12h4v8h-4zM16 12h4v8h-4z" />
       </svg>
     ),
   },
   {
-    href: '/cars',
-    label: '車登録',
+    href: '/settings',
+    label: '設定',
     icon: (active: boolean) => (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <path d="M5 17H3v-5l2-5h14l2 5v5h-2" />
-        <circle cx="7.5" cy="17.5" r="2.5" />
-        <circle cx="16.5" cy="17.5" r="2.5" />
-      </svg>
-    ),
-  },
-  {
-    href: '/history',
-    label: '履歴',
-    icon: (active: boolean) => (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <circle cx="12" cy="12" r="9" />
-        <polyline points="12 6 12 12 16 14" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth={active ? 2.5 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
       </svg>
     ),
   },
@@ -51,7 +40,7 @@ export default function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex-1 flex flex-col items-center py-2 gap-0.5 text-xs transition-colors ${
+              className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${
                 isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
