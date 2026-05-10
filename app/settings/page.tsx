@@ -159,6 +159,20 @@ function RouteCard({
             </div>
           )}
 
+          {trip.parking_segments && trip.parking_segments.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">駐車場</p>
+              <div className="space-y-1">
+                {trip.parking_segments.map((s) => (
+                  <div key={s.id} className="flex justify-between text-sm">
+                    <span className="text-gray-700">{s.location || '（場所未入力）'}</span>
+                    <span className="text-purple-600 font-medium">{formatCurrency(s.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 費用サマリー */}
           <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
             <div className="flex justify-between text-sm">
@@ -177,6 +191,12 @@ function RouteCard({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">高速料金（ETC）</span>
                 <span className="text-orange-600">{formatCurrency(trip.toll_cost)}</span>
+              </div>
+            )}
+            {(trip.parking_cost ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">駐車場代</span>
+                <span className="text-purple-600">{formatCurrency(trip.parking_cost)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm font-bold border-t border-gray-200 pt-1.5 mt-1.5">
@@ -458,32 +478,22 @@ function CarsTab() {
 // ─── 出力タブ（税務署提出用） ──────────────────────────────
 function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
 
+  // 税務署提出用（1行1トリップ）
   const handleExportTax = () => {
     const rows: string[][] = [];
 
-    // ヘッダー
     rows.push([
-      '日付',
-      '旅行名',
-      '経路（経由地）',
-      '経由高速道路',
-      'ガソリン代（円）',
-      '高速道路料金（円）',
-      '合計（円）',
+      '日付', '旅行名', '経路（経由地）', '経由高速道路',
+      'ガソリン代（円）', '高速道路料金（円）', '駐車場代（円）', '合計（円）',
     ]);
 
     trips.forEach((trip) => {
       const wps = trip.waypoints ?? [];
       const tolls = trip.toll_segments ?? [];
-
-      // 経路: "出発地 → 経由地1 → 目的地"
       const route = wps.map((w) => w.place_name).join(' → ');
-
-      // 経由高速道路: "東京IC→名古屋IC、名古屋IC→大阪IC"
       const highways = tolls.length > 0
         ? tolls.map((s) => `${s.from_ic}→${s.to_ic}`).join('、')
         : '−';
-
       rows.push([
         formatDateShort(trip.created_at),
         trip.name ?? '',
@@ -491,89 +501,139 @@ function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
         highways,
         String(trip.fuel_cost),
         String(trip.toll_cost),
+        String(trip.parking_cost ?? 0),
         String(trip.total_cost),
       ]);
     });
 
-    // 合計行
     if (trips.length > 0) {
-      const totalFuel = trips.reduce((s, t) => s + t.fuel_cost, 0);
-      const totalToll = trips.reduce((s, t) => s + t.toll_cost, 0);
-      const totalAll  = trips.reduce((s, t) => s + t.total_cost, 0);
+      const totalFuel    = trips.reduce((s, t) => s + t.fuel_cost, 0);
+      const totalToll    = trips.reduce((s, t) => s + t.toll_cost, 0);
+      const totalParking = trips.reduce((s, t) => s + (t.parking_cost ?? 0), 0);
+      const totalAll     = trips.reduce((s, t) => s + t.total_cost, 0);
       rows.push([]);
-      rows.push(['合計', '', '', '', String(totalFuel), String(totalToll), String(totalAll)]);
+      rows.push(['合計', '', '', '', String(totalFuel), String(totalToll), String(totalParking), String(totalAll)]);
     }
 
+    downloadCsv(rows, `交通費明細_${todayStr()}.csv`);
+  };
+
+  // freee / マネーフォワード用（1行1費目）
+  const handleExportAccounting = () => {
+    const rows: string[][] = [];
+    rows.push(['日付', '内容', '金額（円）']);
+
+    trips.forEach((trip) => {
+      const wps = trip.waypoints ?? [];
+      const route = wps.length >= 2
+        ? `${wps[0].place_name}→${wps[wps.length - 1].place_name}`
+        : (trip.name ?? '移動');
+      const label = trip.name ? `${trip.name}（${route}）` : route;
+      const date = formatDateShort(trip.created_at);
+
+      // ガソリン代
+      rows.push([date, `ガソリン代（${label}）`, String(trip.fuel_cost)]);
+
+      // 高速料金（IC区間ごと）
+      const tolls = trip.toll_segments ?? [];
+      if (tolls.length > 0) {
+        tolls.forEach((s) => {
+          rows.push([date, `高速料金（${s.from_ic}→${s.to_ic}）`, String(s.amount)]);
+        });
+      } else if (trip.toll_cost > 0) {
+        rows.push([date, `高速料金（${label}）`, String(trip.toll_cost)]);
+      }
+
+      // 駐車場代（場所ごと）
+      const parkings = trip.parking_segments ?? [];
+      if (parkings.length > 0) {
+        parkings.forEach((p) => {
+          const loc = p.location || '駐車場';
+          rows.push([date, `駐車場代（${loc}）`, String(p.amount)]);
+        });
+      } else if ((trip.parking_cost ?? 0) > 0) {
+        rows.push([date, `駐車場代（${label}）`, String(trip.parking_cost)]);
+      }
+    });
+
+    downloadCsv(rows, `交通費_会計ソフト用_${todayStr()}.csv`);
+  };
+
+  function todayStr() {
+    return new Date().toLocaleDateString('ja-JP').replace(/\//g, '-');
+  }
+
+  function downloadCsv(rows: string[][], filename: string) {
     const csv =
       '﻿' +
       rows
         .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
         .join('\r\n');
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const today = new Date().toLocaleDateString('ja-JP').replace(/\//g, '-');
-    a.download = `交通費明細_${today}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }
 
   if (loading) return <div className="text-center py-8 text-gray-400 text-sm">読み込み中...</div>;
 
   return (
     <div className="space-y-4">
-      {/* サンプルプレビュー */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-        <p className="text-xs font-semibold text-blue-700 mb-2">📋 出力される列（税務署提出用）</p>
-        <div className="space-y-1 text-xs text-blue-800">
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">日付</span>
-            <span>2024/01/15</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">旅行名</span>
-            <span>〇〇出張</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">経路</span>
-            <span>東京 → 名古屋 → 大阪</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">経由高速道路</span>
-            <span>東京IC→名古屋IC</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">ガソリン代</span>
-            <span>3,250円</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-24 flex-shrink-0 text-blue-500">高速道路料金</span>
-            <span>3,220円</span>
-          </div>
-          <div className="flex gap-2 border-t border-blue-200 pt-1">
-            <span className="w-24 flex-shrink-0 text-blue-500">合計</span>
-            <span className="font-bold">6,470円</span>
+
+      {/* 税務署提出用 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🏛️</span>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">税務署提出用</p>
+            <p className="text-xs text-gray-500">1行1件・確定申告の交通費明細に</p>
           </div>
         </div>
-        <p className="text-xs text-blue-500 pt-1">最終行に全件の合計が自動追加されます</p>
+        <div className="text-xs text-gray-500 space-y-0.5 pl-1">
+          <p>日付 / 旅行名 / 経路 / 経由高速道路</p>
+          <p>ガソリン代 / 高速料金 / 駐車場代 / 合計</p>
+          <p className="text-gray-400">最終行に全件の合計が自動追加されます</p>
+        </div>
+        <button
+          onClick={handleExportTax}
+          disabled={trips.length === 0}
+          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm transition-colors"
+        >
+          📥 税務署用をダウンロード（{trips.length}件）
+        </button>
       </div>
 
-      <button
-        onClick={handleExportTax}
-        disabled={trips.length === 0}
-        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white font-bold rounded-xl text-sm transition-colors shadow-sm"
-      >
-        📥 交通費明細をダウンロード（{trips.length}件）
-      </button>
+      {/* freee / マネーフォワード用 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">📱</span>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">freee / マネーフォワード用</p>
+            <p className="text-xs text-gray-500">費目ごとに1行・会計ソフトに読み込める形式</p>
+          </div>
+        </div>
+        <div className="text-xs text-gray-500 space-y-0.5 pl-1">
+          <p>列：日付 / 内容 / 金額</p>
+          <p>ガソリン代・高速料金・駐車場代を別行で出力</p>
+          <p className="text-gray-400">例：「ガソリン代（東京→大阪）　3,250円」</p>
+        </div>
+        <button
+          onClick={handleExportAccounting}
+          disabled={trips.length === 0}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm transition-colors"
+        >
+          📥 会計ソフト用をダウンロード（{trips.length}件）
+        </button>
+      </div>
 
       {trips.length === 0 && (
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-gray-400 py-2">
           保存された経路がありません。計算ページで旅行を保存してください。
         </p>
       )}
-
       <p className="text-center text-xs text-gray-400">
         CSV形式 / Excelで開くと日本語が正しく表示されます
       </p>

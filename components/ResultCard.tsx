@@ -1,11 +1,12 @@
 'use client';
 
 import { formatCurrency, formatDistance } from '@/lib/calculations';
-import type { CalculationResult, WaypointInput } from '@/types';
+import type { CalculationResult, WaypointInput, ParkingInput } from '@/types';
 
 type Props = {
   result: CalculationResult;
   waypoints: WaypointInput[];
+  parkingSegments: ParkingInput[];
   carName: string;
   gasPrice: number;
   tripName: string;
@@ -18,6 +19,7 @@ type Props = {
 export default function ResultCard({
   result,
   waypoints,
+  parkingSegments,
   carName,
   gasPrice,
   tripName,
@@ -64,6 +66,19 @@ export default function ResultCard({
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">高速料金（ETC合計）</span>
               <span className="font-medium text-orange-600">{formatCurrency(result.tollCost)}</span>
+            </div>
+          )}
+          {result.parkingCost > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">
+                駐車場代
+                {parkingSegments.length > 0 && (
+                  <span className="text-xs text-gray-400 ml-1">
+                    ({parkingSegments.filter(s => s.amount > 0).map(s => s.location || '未入力').join('・')})
+                  </span>
+                )}
+              </span>
+              <span className="font-medium text-purple-600">{formatCurrency(result.parkingCost)}</span>
             </div>
           )}
         </div>

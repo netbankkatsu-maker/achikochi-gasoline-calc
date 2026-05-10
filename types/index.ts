@@ -21,12 +21,20 @@ export type TollSegment = {
   amount: number;
 };
 
+export type ParkingSegment = {
+  id: string;
+  trip_id: string;
+  location: string;
+  amount: number;
+};
+
 export type Trip = {
   id: string;
   name: string | null;
   total_distance_km: number;
   fuel_cost: number;
   toll_cost: number;
+  parking_cost: number;
   total_cost: number;
   gas_price_per_liter: number;
   car_name: string;
@@ -34,6 +42,7 @@ export type Trip = {
   created_at: string;
   waypoints?: Waypoint[];
   toll_segments?: TollSegment[];
+  parking_segments?: ParkingSegment[];
 };
 
 export type WaypointInput = {
@@ -50,10 +59,17 @@ export type TollSegmentInput = {
   amount: number;
 };
 
+export type ParkingInput = {
+  tempId: string;
+  location: string;
+  amount: number;
+};
+
 export type CalculationResult = {
   totalDistanceKm: number;
   fuelCost: number;
   tollCost: number;
+  parkingCost: number;
   totalCost: number;
   segmentDistances: number[];
 };

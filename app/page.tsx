@@ -5,11 +5,12 @@ import { useGoogleMaps } from '@/hooks/useGoogleMaps';
 import { useCars } from '@/hooks/useCars';
 import { useTrips } from '@/hooks/useTrips';
 import { calculateRoute } from '@/lib/google-maps';
-import { calculateFuelCost, calculateTollCost } from '@/lib/calculations';
+import { calculateFuelCost, calculateTollCost, calculateParkingCost } from '@/lib/calculations';
 import WaypointList from '@/components/WaypointList';
 import TollSegmentList from '@/components/TollSegmentList';
+import ParkingList from '@/components/ParkingList';
 import ResultCard from '@/components/ResultCard';
-import type { WaypointInput, TollSegmentInput, CalculationResult } from '@/types';
+import type { WaypointInput, TollSegmentInput, ParkingInput, CalculationResult } from '@/types';
 
 const GAS_PRESETS = [155, 165, 175, 185];
 
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [gasPrice, setGasPrice] = useState(175);
   const [avoidTolls, setAvoidTolls] = useState(true);
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
+  const [parkingSegments, setParkingSegments] = useState<ParkingInput[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [tripName, setTripName] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
@@ -78,13 +80,21 @@ export default function HomePage() {
   const addTollSegment = () => {
     setTollSegments((prev) => [...prev, { tempId: uuid(), from_ic: '', to_ic: '', amount: 0 }]);
   };
-
   const removeTollSegment = (tempId: string) => {
     setTollSegments((prev) => prev.filter((s) => s.tempId !== tempId));
   };
-
   const updateTollSegment = (tempId: string, updates: Partial<TollSegmentInput>) => {
     setTollSegments((prev) => prev.map((s) => (s.tempId === tempId ? { ...s, ...updates } : s)));
+  };
+
+  const addParkingSegment = () => {
+    setParkingSegments((prev) => [...prev, { tempId: uuid(), location: '', amount: 0 }]);
+  };
+  const removeParkingSegment = (tempId: string) => {
+    setParkingSegments((prev) => prev.filter((s) => s.tempId !== tempId));
+  };
+  const updateParkingSegment = (tempId: string, updates: Partial<ParkingInput>) => {
+    setParkingSegments((prev) => prev.map((s) => (s.tempId === tempId ? { ...s, ...updates } : s)));
   };
 
   const handleCalculate = async () => {
@@ -125,12 +135,14 @@ export default function HomePage() {
 
       const fuelCost = calculateFuelCost(totalKm, selectedCar.fuel_efficiency, gasPrice);
       const tollCost = avoidTolls ? 0 : calculateTollCost(tollSegments);
+      const parkingCost = calculateParkingCost(parkingSegments);
 
       setResult({
         totalDistanceKm: totalKm,
         fuelCost,
         tollCost,
-        totalCost: fuelCost + tollCost,
+        parkingCost,
+        totalCost: fuelCost + tollCost + parkingCost,
         segmentDistances,
       });
     } catch (e: unknown) {
@@ -149,12 +161,14 @@ export default function HomePage() {
         totalDistanceKm: result.totalDistanceKm,
         fuelCost: result.fuelCost,
         tollCost: result.tollCost,
+        parkingCost: result.parkingCost,
         totalCost: result.totalCost,
         gasPricePerLiter: gasPrice,
         carName: selectedCar.name,
         fuelEfficiency: selectedCar.fuel_efficiency,
-        waypoints: resultWaypoints, // use filled waypoints that align with segmentDistances
+        waypoints: resultWaypoints,
         tollSegments,
+        parkingSegments,
         segmentDistances: result.segmentDistances,
       });
       setSavedMessage(true);
@@ -183,8 +197,8 @@ export default function HomePage() {
       : '−';
 
     const rows: string[][] = [
-      ['日付', '旅行名', '経路（経由地）', '経由高速道路', 'ガソリン代（円）', '高速道路料金（円）', '合計（円）'],
-      [today, tripName, route, highways, String(result.fuelCost), String(result.tollCost), String(result.totalCost)],
+      ['日付', '旅行名', '経路（経由地）', '経由高速道路', 'ガソリン代（円）', '高速道路料金（円）', '駐車場代（円）', '合計（円）'],
+      [today, tripName, route, highways, String(result.fuelCost), String(result.tollCost), String(result.parkingCost), String(result.totalCost)],
     ];
 
     const csvContent =
@@ -238,6 +252,14 @@ export default function HomePage() {
           onUpdate={updateTollSegment}
         />
       )}
+
+      {/* 駐車場代 */}
+      <ParkingList
+        segments={parkingSegments}
+        onAdd={addParkingSegment}
+        onRemove={removeParkingSegment}
+        onUpdate={updateParkingSegment}
+      />
 
       {/* 車選択 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
@@ -312,6 +334,7 @@ export default function HomePage() {
         <ResultCard
           result={result}
           waypoints={resultWaypoints}
+          parkingSegments={parkingSegments}
           carName={selectedCar.name}
           gasPrice={gasPrice}
           tripName={tripName}

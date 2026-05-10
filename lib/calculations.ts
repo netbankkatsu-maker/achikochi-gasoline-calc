@@ -12,6 +12,9 @@ export function calculateTollCost(segments: { amount: number }[]): number {
   return segments.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 }
 
+// 駐車場代合計（toll と同じ構造なので共通関数で計算可能だが可読性のため分離）
+export const calculateParkingCost = calculateTollCost;
+
 export function sumDistances(distances: (number | undefined)[]): number {
   return distances.reduce((sum: number, d) => sum + (d ?? 0), 0);
 }

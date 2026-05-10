@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Trip, WaypointInput, TollSegmentInput } from '@/types';
+import type { Trip, WaypointInput, TollSegmentInput, ParkingInput } from '@/types';
 
 function parseTrip(raw: Record<string, unknown>): Trip {
   return {
@@ -11,6 +11,7 @@ function parseTrip(raw: Record<string, unknown>): Trip {
     total_distance_km: parseFloat(raw.total_distance_km as string),
     fuel_cost: Number(raw.fuel_cost),
     toll_cost: Number(raw.toll_cost),
+    parking_cost: Number(raw.parking_cost ?? 0),
     total_cost: Number(raw.total_cost),
     gas_price_per_liter: Number(raw.gas_price_per_liter),
     car_name: raw.car_name as string,
@@ -44,6 +45,10 @@ export function useTrips() {
           .from('toll_segments')
           .select('*')
           .eq('trip_id', t.id);
+        const { data: parkings } = await supabase
+          .from('parking_segments')
+          .select('*')
+          .eq('trip_id', t.id);
         return {
           ...trip,
           waypoints: (wps ?? []).map((w) => ({
@@ -51,6 +56,7 @@ export function useTrips() {
             distance_from_prev_km: w.distance_from_prev_km ? parseFloat(w.distance_from_prev_km) : null,
           })),
           toll_segments: tolls ?? [],
+          parking_segments: parkings ?? [],
         };
       })
     );
@@ -67,12 +73,14 @@ export function useTrips() {
     totalDistanceKm: number;
     fuelCost: number;
     tollCost: number;
+    parkingCost: number;
     totalCost: number;
     gasPricePerLiter: number;
     carName: string;
     fuelEfficiency: number;
     waypoints: WaypointInput[];
     tollSegments: TollSegmentInput[];
+    parkingSegments: ParkingInput[];
     segmentDistances: number[];
   }) => {
     const { data: tripData, error: tripError } = await supabase
@@ -82,6 +90,7 @@ export function useTrips() {
         total_distance_km: params.totalDistanceKm,
         fuel_cost: params.fuelCost,
         toll_cost: params.tollCost,
+        parking_cost: params.parkingCost,
         total_cost: params.totalCost,
         gas_price_per_liter: params.gasPricePerLiter,
         car_name: params.carName,
@@ -108,6 +117,16 @@ export function useTrips() {
           trip_id: tripId,
           from_ic: s.from_ic,
           to_ic: s.to_ic,
+          amount: s.amount,
+        }))
+      );
+    }
+
+    if (params.parkingSegments.length > 0) {
+      await supabase.from('parking_segments').insert(
+        params.parkingSegments.map((s) => ({
+          trip_id: tripId,
+          location: s.location,
           amount: s.amount,
         }))
       );
