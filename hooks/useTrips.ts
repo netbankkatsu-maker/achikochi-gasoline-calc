@@ -122,5 +122,13 @@ export function useTrips() {
     setTrips((prev) => prev.filter((t) => t.id !== id));
   };
 
-  return { trips, loading, saveTrip, deleteTrip, refetch: fetchTrips };
+  const updateTrip = async (id: string, updates: { name?: string }) => {
+    const { error } = await supabase.from('trips').update(updates).eq('id', id);
+    if (error) throw new Error(error.message);
+    setTrips((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+  };
+
+  return { trips, loading, saveTrip, deleteTrip, updateTrip, refetch: fetchTrips };
 }

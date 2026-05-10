@@ -118,7 +118,7 @@ export default function WaypointList({ waypoints, isLoaded, avoidTolls, onUpdate
                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
             }`}
           >
-            🛣️ 通常（高速あり）
+            🛣️ 高速利用
           </button>
           <button
             onClick={() => !avoidTolls && onToggleAvoidTolls()}

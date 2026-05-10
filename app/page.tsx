@@ -30,7 +30,7 @@ export default function HomePage() {
   const [resultWaypoints, setResultWaypoints] = useState<WaypointInput[]>([]);
   const [selectedCarId, setSelectedCarId] = useState('');
   const [gasPrice, setGasPrice] = useState(175);
-  const [avoidTolls, setAvoidTolls] = useState(false);
+  const [avoidTolls, setAvoidTolls] = useState(true);
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [tripName, setTripName] = useState('');
@@ -170,54 +170,34 @@ export default function HomePage() {
   const handleExportCsv = () => {
     if (!result || !selectedCar) return;
 
-    const rows: string[][] = [];
-
-    // ヘッダー情報
-    rows.push(['ガソリン代計算結果']);
-    rows.push(['車種', selectedCar.name]);
-    rows.push(['燃費', `${selectedCar.fuel_efficiency} km/L`]);
-    rows.push(['ガソリン単価', `${gasPrice} 円/L`]);
-    if (tripName) rows.push(['旅行名', tripName]);
-    rows.push([]);
-
-    // 経由地と区間距離
-    rows.push(['#', '地点名', '区間距離 (km)']);
-    resultWaypoints.forEach((wp, i) => {
-      const dist = i === 0 ? '' : result.segmentDistances[i - 1]?.toFixed(1) ?? '';
-      rows.push([String(i + 1), wp.place_name, dist]);
+    const today = new Date().toLocaleDateString('ja-JP', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
     });
-    rows.push([]);
 
-    // 高速料金
-    if (tollSegments.length > 0) {
-      rows.push(['高速区間', '乗り口', '降り口', '料金 (円)']);
-      tollSegments.forEach((s) => {
-        rows.push(['', s.from_ic, s.to_ic, String(s.amount)]);
-      });
-      rows.push([]);
-    }
+    // 経路文字列
+    const route = resultWaypoints.map((w) => w.place_name).join(' → ');
 
-    // 合計
-    rows.push(['総距離', `${result.totalDistanceKm.toFixed(1)} km`]);
-    rows.push(['燃料費', `${result.fuelCost} 円`]);
-    if (result.tollCost > 0) rows.push(['高速料金合計', `${result.tollCost} 円`]);
-    rows.push(['合計', `${result.totalCost} 円`]);
+    // 経由高速道路
+    const highways = tollSegments.length > 0
+      ? tollSegments.map((s) => `${s.from_ic}→${s.to_ic}`).join('、')
+      : '−';
 
-    // CSV文字列生成（UTF-8 BOM付き for Excel）
+    const rows: string[][] = [
+      ['日付', '旅行名', '経路（経由地）', '経由高速道路', 'ガソリン代（円）', '高速道路料金（円）', '合計（円）'],
+      [today, tripName, route, highways, String(result.fuelCost), String(result.tollCost), String(result.totalCost)],
+    ];
+
     const csvContent =
       '﻿' +
       rows
-        .map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-        )
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\r\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const filename = tripName ? `${tripName}.csv` : 'ガソリン代計算結果.csv';
-    a.download = filename;
+    a.download = tripName ? `${tripName}.csv` : `交通費明細_${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -252,6 +232,7 @@ export default function HomePage() {
       {!avoidTolls && (
         <TollSegmentList
           segments={tollSegments}
+          isLoaded={isLoaded}
           onAdd={addTollSegment}
           onRemove={removeTollSegment}
           onUpdate={updateTollSegment}

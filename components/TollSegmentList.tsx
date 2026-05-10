@@ -3,16 +3,18 @@
 import { useState } from 'react';
 import { estimateRouteToll } from '@/lib/google-maps';
 import { formatCurrency } from '@/lib/calculations';
+import ICAutocompleteInput from './ICAutocompleteInput';
 import type { TollSegmentInput } from '@/types';
 
 type Props = {
   segments: TollSegmentInput[];
+  isLoaded: boolean;
   onAdd: () => void;
   onRemove: (tempId: string) => void;
   onUpdate: (tempId: string, updates: Partial<TollSegmentInput>) => void;
 };
 
-export default function TollSegmentList({ segments, onAdd, onRemove, onUpdate }: Props) {
+export default function TollSegmentList({ segments, isLoaded, onAdd, onRemove, onUpdate }: Props) {
   // tempId → 推定中かどうか
   const [estimatingIds, setEstimatingIds] = useState<Set<string>>(new Set());
   // tempId → 推定失敗メッセージ
@@ -48,14 +50,6 @@ export default function TollSegmentList({ segments, onAdd, onRemove, onUpdate }:
     <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-800 text-sm">🛣️ 高速料金（ETC）</h2>
-        <a
-          href="https://www.driveplaza.com/dp/SearchTop"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-blue-600 underline"
-        >
-          NEXCO料金確認 ↗
-        </a>
       </div>
 
       {segments.length === 0 && (
@@ -77,22 +71,20 @@ export default function TollSegmentList({ segments, onAdd, onRemove, onUpdate }:
                 <div className="flex-1 grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">乗ったIC</label>
-                    <input
-                      type="text"
+                    <ICAutocompleteInput
                       value={seg.from_ic}
-                      onChange={(e) => onUpdate(seg.tempId, { from_ic: e.target.value })}
+                      onChange={(v) => onUpdate(seg.tempId, { from_ic: v })}
                       placeholder="例: 東京IC"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                      isLoaded={isLoaded}
                     />
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">降りたIC</label>
-                    <input
-                      type="text"
+                    <ICAutocompleteInput
                       value={seg.to_ic}
-                      onChange={(e) => onUpdate(seg.tempId, { to_ic: e.target.value })}
+                      onChange={(v) => onUpdate(seg.tempId, { to_ic: v })}
                       placeholder="例: 名古屋IC"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                      isLoaded={isLoaded}
                     />
                   </div>
                 </div>

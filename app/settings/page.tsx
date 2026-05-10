@@ -7,57 +7,136 @@ import { formatCurrency, formatDistance } from '@/lib/calculations';
 import type { Car, Trip } from '@/types';
 
 // ─── 共通 ───────────────────────────────────────────────
-type Tab = 'history' | 'cars' | 'export';
+type Tab = 'routes' | 'cars' | 'export';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ja-JP', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    year: 'numeric', month: 'long', day: 'numeric',
   });
 }
 
-// ─── 履歴 ───────────────────────────────────────────────
-function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => void }) {
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+}
+
+// ─── 経路カード ──────────────────────────────────────────
+function RouteCard({
+  trip,
+  onDelete,
+  onUpdate,
+}: {
+  trip: Trip;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, updates: { name?: string }) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(trip.name ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const displayName =
+    trip.name ||
+    (trip.waypoints && trip.waypoints.length >= 2
+      ? `${trip.waypoints[0].place_name} → ${trip.waypoints[trip.waypoints.length - 1].place_name}`
+      : '経路記録');
+
+  const handleSaveName = async () => {
+    setSaving(true);
+    try {
+      await onUpdate(trip.id, { name: nameInput.trim() || null as unknown as string });
+      setEditingName(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-800 truncate">
-            {trip.name || (trip.waypoints?.[0]?.place_name
-              ? `${trip.waypoints[0].place_name} → ${trip.waypoints[trip.waypoints.length - 1]?.place_name}`
-              : '旅行記録')}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">{formatDate(trip.created_at)}</p>
-        </div>
-        <div className="flex items-center gap-3 ml-2">
-          <span className="text-base font-bold text-blue-600 flex-shrink-0">
+      {/* ヘッダー */}
+      <div className="px-4 py-3 flex items-center gap-2">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex-1 flex items-center gap-2 text-left min-w-0"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-800 truncate text-sm">{displayName}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatDate(trip.created_at)}</p>
+          </div>
+          <span className="text-sm font-bold text-blue-600 flex-shrink-0">
             {formatCurrency(trip.total_cost)}
           </span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-            className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+            strokeWidth={2} stroke="currentColor"
+            className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
-        </div>
-      </button>
+        </button>
+      </div>
 
+      {/* 展開コンテンツ */}
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+
+          {/* 名前編集 */}
+          <div className="pt-3">
+            {editingName ? (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                  placeholder="旅行名を入力"
+                  autoFocus
+                  className="flex-1 px-3 py-1.5 border border-blue-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={saving}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:bg-gray-300"
+                >
+                  {saving ? '保存中' : '保存'}
+                </button>
+                <button
+                  onClick={() => { setEditingName(false); setNameInput(trip.name ?? ''); }}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-xs"
+                >
+                  キャンセル
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingName(true)}
+                className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+                旅行名を編集
+              </button>
+            )}
+          </div>
+
+          {/* ルート */}
           {trip.waypoints && trip.waypoints.length > 0 && (
-            <div className="pt-3">
+            <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">ルート</p>
               <div className="space-y-1">
                 {trip.waypoints.map((wp, i) => (
                   <div key={wp.id} className="flex items-center gap-2 text-sm">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold flex-shrink-0">
+                      {i + 1}
+                    </span>
                     <span className="text-gray-700 truncate">{wp.place_name}</span>
                     {wp.distance_from_prev_km != null && (
-                      <span className="text-gray-400 text-xs ml-auto flex-shrink-0">{formatDistance(wp.distance_from_prev_km)}</span>
+                      <span className="text-gray-400 text-xs ml-auto flex-shrink-0">
+                        {formatDistance(wp.distance_from_prev_km)}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -65,6 +144,22 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => vo
             </div>
           )}
 
+          {/* 高速区間 */}
+          {trip.toll_segments && trip.toll_segments.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">高速区間（ETC）</p>
+              <div className="space-y-1">
+                {trip.toll_segments.map((s) => (
+                  <div key={s.id} className="flex justify-between text-sm">
+                    <span className="text-gray-700">{s.from_ic} → {s.to_ic}</span>
+                    <span className="text-orange-600 font-medium">{formatCurrency(s.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 費用サマリー */}
           <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">総距離</span>
@@ -90,34 +185,27 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => vo
             </div>
           </div>
 
-          {trip.toll_segments && trip.toll_segments.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">高速区間</p>
-              <div className="space-y-1">
-                {trip.toll_segments.map((s) => (
-                  <div key={s.id} className="flex justify-between text-sm">
-                    <span className="text-gray-700">{s.from_ic} → {s.to_ic}</span>
-                    <span className="text-orange-600">{formatCurrency(s.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
+          {/* 削除 */}
           {confirmDelete ? (
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setConfirmDelete(false)}
-                className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+              >
                 キャンセル
               </button>
-              <button onClick={() => onDelete(trip.id)}
-                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">
+              <button
+                onClick={() => onDelete(trip.id)}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+              >
                 削除する
               </button>
             </div>
           ) : (
-            <button onClick={() => setConfirmDelete(true)}
-              className="w-full py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 transition-colors">
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 transition-colors"
+            >
               この記録を削除
             </button>
           )}
@@ -127,27 +215,45 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: (id: string) => vo
   );
 }
 
-function HistoryTab({ trips, loading, deleteTrip }: {
+// ─── 経路タブ ────────────────────────────────────────────
+function RoutesTab({
+  trips,
+  loading,
+  deleteTrip,
+  updateTrip,
+}: {
   trips: Trip[];
   loading: boolean;
   deleteTrip: (id: string) => void;
+  updateTrip: (id: string, updates: { name?: string }) => Promise<void>;
 }) {
-  if (loading) return <div className="text-center py-8 text-gray-400 text-sm">読み込み中...</div>;
-  if (trips.length === 0) return (
-    <div className="text-center py-12 text-gray-400">
-      <p className="text-4xl mb-2">📋</p>
-      <p className="text-sm">まだ記録がありません</p>
-      <p className="text-xs mt-1">計算ページで旅行を保存してください</p>
-    </div>
-  );
+  if (loading) {
+    return <div className="text-center py-8 text-gray-400 text-sm">読み込み中...</div>;
+  }
+  if (trips.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="text-4xl mb-2">🗺️</p>
+        <p className="text-sm">まだ保存された経路がありません</p>
+        <p className="text-xs mt-1">計算ページで旅行を保存してください</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
-      {trips.map((trip) => <TripCard key={trip.id} trip={trip} onDelete={deleteTrip} />)}
+      {trips.map((trip) => (
+        <RouteCard
+          key={trip.id}
+          trip={trip}
+          onDelete={deleteTrip}
+          onUpdate={updateTrip}
+        />
+      ))}
     </div>
   );
 }
 
-// ─── 車登録 ──────────────────────────────────────────────
+// ─── 車登録タブ ───────────────────────────────────────────
 type FormState = { name: string; fuel_efficiency: string };
 const emptyForm: FormState = { name: '', fuel_efficiency: '' };
 
@@ -199,8 +305,10 @@ function CarsTab() {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => { setShowAdd(true); setError(null); }}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => { setShowAdd(true); setError(null); }}
+          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
           ＋ 追加
         </button>
       </div>
@@ -214,25 +322,33 @@ function CarsTab() {
           <h3 className="font-semibold text-sm text-gray-700">新しい車を追加</h3>
           <div>
             <label className="text-xs text-gray-500 block mb-1">車の名前</label>
-            <input type="text" value={addForm.name}
+            <input
+              type="text" value={addForm.name}
               onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="例: プリウス、N-BOX"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">燃費 (km/L)</label>
-            <input type="number" value={addForm.fuel_efficiency}
+            <input
+              type="number" value={addForm.fuel_efficiency}
               onChange={(e) => setAddForm((f) => ({ ...f, fuel_efficiency: e.target.value }))}
               placeholder="例: 20.5" step="0.1" min="1" max="50"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setShowAdd(false); setAddForm(emptyForm); setError(null); }}
-              className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+            <button
+              onClick={() => { setShowAdd(false); setAddForm(emptyForm); setError(null); }}
+              className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+            >
               キャンセル
             </button>
-            <button onClick={handleAdd} disabled={saving}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 transition-colors">
+            <button
+              onClick={handleAdd} disabled={saving}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 transition-colors"
+            >
               {saving ? '保存中...' : '保存する'}
             </button>
           </div>
@@ -255,38 +371,52 @@ function CarsTab() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">車の名前</label>
-                    <input type="text" value={editForm.name}
+                    <input
+                      type="text" value={editForm.name}
                       onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">燃費 (km/L)</label>
-                    <input type="number" value={editForm.fuel_efficiency}
+                    <input
+                      type="number" value={editForm.fuel_efficiency}
                       onChange={(e) => setEditForm((f) => ({ ...f, fuel_efficiency: e.target.value }))}
                       step="0.1" min="1" max="50"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingId(null); setError(null); }}
-                      className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+                    <button
+                      onClick={() => { setEditingId(null); setError(null); }}
+                      className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+                    >
                       キャンセル
                     </button>
-                    <button onClick={handleUpdate} disabled={saving}
-                      className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300">
+                    <button
+                      onClick={handleUpdate} disabled={saving}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300"
+                    >
                       {saving ? '保存中...' : '更新する'}
                     </button>
                   </div>
                 </div>
               ) : deleteConfirmId === car.id ? (
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-700"><span className="font-semibold">{car.name}</span> を削除しますか？</p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">{car.name}</span> を削除しますか？
+                  </p>
                   <div className="flex gap-2">
-                    <button onClick={() => setDeleteConfirmId(null)}
-                      className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+                    <button
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+                    >
                       キャンセル
                     </button>
-                    <button onClick={() => handleDelete(car.id)}
-                      className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">
+                    <button
+                      onClick={() => handleDelete(car.id)}
+                      className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                    >
                       削除する
                     </button>
                   </div>
@@ -298,12 +428,20 @@ function CarsTab() {
                     <p className="text-sm text-gray-500">{car.fuel_efficiency} km/L</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingId(car.id); setEditForm({ name: car.name, fuel_efficiency: String(car.fuel_efficiency) }); setError(null); }}
-                      className="px-3 py-1.5 text-xs border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50">
+                    <button
+                      onClick={() => {
+                        setEditingId(car.id);
+                        setEditForm({ name: car.name, fuel_efficiency: String(car.fuel_efficiency) });
+                        setError(null);
+                      }}
+                      className="px-3 py-1.5 text-xs border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
+                    >
                       編集
                     </button>
-                    <button onClick={() => setDeleteConfirmId(car.id)}
-                      className="px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">
+                    <button
+                      onClick={() => setDeleteConfirmId(car.id)}
+                      className="px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50"
+                    >
                       削除
                     </button>
                   </div>
@@ -317,85 +455,67 @@ function CarsTab() {
   );
 }
 
-// ─── スプレッドシート出力 ────────────────────────────────
+// ─── 出力タブ（税務署提出用） ──────────────────────────────
 function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
-  const handleExportAll = () => {
+
+  const handleExportTax = () => {
     const rows: string[][] = [];
 
-    rows.push(['日付', '旅行名', '出発地', '目的地', '経由地数', '総距離(km)',
-      '車種', '燃費(km/L)', 'ガソリン単価(円/L)', '燃料費(円)', '高速料金(円)', '合計(円)']);
+    // ヘッダー
+    rows.push([
+      '日付',
+      '旅行名',
+      '経路（経由地）',
+      '経由高速道路',
+      'ガソリン代（円）',
+      '高速道路料金（円）',
+      '合計（円）',
+    ]);
 
     trips.forEach((trip) => {
       const wps = trip.waypoints ?? [];
+      const tolls = trip.toll_segments ?? [];
+
+      // 経路: "出発地 → 経由地1 → 目的地"
+      const route = wps.map((w) => w.place_name).join(' → ');
+
+      // 経由高速道路: "東京IC→名古屋IC、名古屋IC→大阪IC"
+      const highways = tolls.length > 0
+        ? tolls.map((s) => `${s.from_ic}→${s.to_ic}`).join('、')
+        : '−';
+
       rows.push([
-        new Date(trip.created_at).toLocaleString('ja-JP'),
+        formatDateShort(trip.created_at),
         trip.name ?? '',
-        wps[0]?.place_name ?? '',
-        wps[wps.length - 1]?.place_name ?? '',
-        String(wps.length),
-        trip.total_distance_km.toFixed(1),
-        trip.car_name,
-        String(trip.fuel_efficiency),
-        String(trip.gas_price_per_liter),
+        route,
+        highways,
         String(trip.fuel_cost),
         String(trip.toll_cost),
         String(trip.total_cost),
       ]);
     });
 
+    // 合計行
+    if (trips.length > 0) {
+      const totalFuel = trips.reduce((s, t) => s + t.fuel_cost, 0);
+      const totalToll = trips.reduce((s, t) => s + t.toll_cost, 0);
+      const totalAll  = trips.reduce((s, t) => s + t.total_cost, 0);
+      rows.push([]);
+      rows.push(['合計', '', '', '', String(totalFuel), String(totalToll), String(totalAll)]);
+    }
+
     const csv =
       '﻿' +
-      rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      rows
+        .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ガソリン代履歴_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportDetail = () => {
-    const rows: string[][] = [];
-
-    trips.forEach((trip, idx) => {
-      if (idx > 0) rows.push([]); // blank line between trips
-
-      const wps = trip.waypoints ?? [];
-      const tolls = trip.toll_segments ?? [];
-
-      rows.push([`▼ ${trip.name || '旅行記録'} (${new Date(trip.created_at).toLocaleString('ja-JP')})`]);
-      rows.push(['車種', trip.car_name, '燃費', `${trip.fuel_efficiency} km/L`,
-        'ガソリン単価', `${trip.gas_price_per_liter} 円/L`]);
-      rows.push([]);
-      rows.push(['#', '地点名', '区間距離(km)']);
-      wps.forEach((wp, i) => {
-        rows.push([String(i + 1), wp.place_name,
-          i === 0 ? '' : (wp.distance_from_prev_km?.toFixed(1) ?? '')]);
-      });
-      rows.push([]);
-      rows.push(['総距離', `${trip.total_distance_km.toFixed(1)} km`,
-        '燃料費', `${trip.fuel_cost} 円`,
-        '高速料金', `${trip.toll_cost} 円`,
-        '合計', `${trip.total_cost} 円`]);
-
-      if (tolls.length > 0) {
-        rows.push([]);
-        rows.push(['高速区間', '乗り口', '降り口', '料金(円)']);
-        tolls.forEach((s) => rows.push(['', s.from_ic, s.to_ic, String(s.amount)]));
-      }
-    });
-
-    const csv =
-      '﻿' +
-      rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ガソリン代履歴_詳細_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.csv`;
+    const today = new Date().toLocaleDateString('ja-JP').replace(/\//g, '-');
+    a.download = `交通費明細_${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -404,53 +524,53 @@ function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📊</span>
-          <div>
-            <p className="font-semibold text-gray-800 text-sm">一覧表（サマリー）</p>
-            <p className="text-xs text-gray-500">1行1件、全履歴をまとめたシート</p>
+      {/* サンプルプレビュー */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+        <p className="text-xs font-semibold text-blue-700 mb-2">📋 出力される列（税務署提出用）</p>
+        <div className="space-y-1 text-xs text-blue-800">
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">日付</span>
+            <span>2024/01/15</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">旅行名</span>
+            <span>〇〇出張</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">経路</span>
+            <span>東京 → 名古屋 → 大阪</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">経由高速道路</span>
+            <span>東京IC→名古屋IC</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">ガソリン代</span>
+            <span>3,250円</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-24 flex-shrink-0 text-blue-500">高速道路料金</span>
+            <span>3,220円</span>
+          </div>
+          <div className="flex gap-2 border-t border-blue-200 pt-1">
+            <span className="w-24 flex-shrink-0 text-blue-500">合計</span>
+            <span className="font-bold">6,470円</span>
           </div>
         </div>
-        <ul className="text-xs text-gray-500 space-y-0.5 pl-1">
-          <li>・ 日付 / 旅行名 / 出発地 / 目的地</li>
-          <li>・ 総距離 / 車種 / 燃費 / ガソリン単価</li>
-          <li>・ 燃料費 / 高速料金 / 合計</li>
-        </ul>
-        <button
-          onClick={handleExportAll}
-          disabled={trips.length === 0}
-          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm transition-colors"
-        >
-          📥 一覧表をダウンロード（{trips.length}件）
-        </button>
+        <p className="text-xs text-blue-500 pt-1">最終行に全件の合計が自動追加されます</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📋</span>
-          <div>
-            <p className="font-semibold text-gray-800 text-sm">詳細シート</p>
-            <p className="text-xs text-gray-500">経由地・区間距離・高速区間ごとの明細</p>
-          </div>
-        </div>
-        <ul className="text-xs text-gray-500 space-y-0.5 pl-1">
-          <li>・ 旅行ごとに区切られた詳細レイアウト</li>
-          <li>・ 各経由地の区間距離を含む</li>
-          <li>・ 高速区間の乗降ICと料金</li>
-        </ul>
-        <button
-          onClick={handleExportDetail}
-          disabled={trips.length === 0}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm transition-colors"
-        >
-          📥 詳細シートをダウンロード（{trips.length}件）
-        </button>
-      </div>
+      <button
+        onClick={handleExportTax}
+        disabled={trips.length === 0}
+        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white font-bold rounded-xl text-sm transition-colors shadow-sm"
+      >
+        📥 交通費明細をダウンロード（{trips.length}件）
+      </button>
 
       {trips.length === 0 && (
-        <p className="text-center text-xs text-gray-400 py-4">
-          保存された履歴がありません。計算ページで旅行を保存してください。
+        <p className="text-center text-xs text-gray-400">
+          保存された経路がありません。計算ページで旅行を保存してください。
         </p>
       )}
 
@@ -463,21 +583,21 @@ function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
 
 // ─── メインページ ─────────────────────────────────────────
 const TABS: { id: Tab; label: string; emoji: string }[] = [
-  { id: 'history', label: '履歴', emoji: '📋' },
-  { id: 'cars',    label: '車登録', emoji: '🚗' },
-  { id: 'export',  label: '出力', emoji: '📊' },
+  { id: 'routes', label: '経路',  emoji: '🗺️' },
+  { id: 'cars',   label: '車登録', emoji: '🚗' },
+  { id: 'export', label: '出力',  emoji: '📊' },
 ];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('history');
-  const { trips, loading: tripsLoading, deleteTrip } = useTrips();
+  const [activeTab, setActiveTab] = useState<Tab>('routes');
+  const { trips, loading: tripsLoading, deleteTrip, updateTrip } = useTrips();
 
   return (
     <div className="p-4 space-y-4">
       <div className="pt-2">
         <h1 className="text-lg font-bold text-gray-800">⚙️ 設定</h1>
-        {activeTab === 'history' && (
-          <p className="text-xs text-gray-500 mt-0.5">{trips.length}件の記録</p>
+        {activeTab === 'routes' && (
+          <p className="text-xs text-gray-500 mt-0.5">{trips.length}件の経路</p>
         )}
       </div>
 
@@ -499,8 +619,13 @@ export default function SettingsPage() {
       </div>
 
       {/* タブコンテンツ */}
-      {activeTab === 'history' && (
-        <HistoryTab trips={trips} loading={tripsLoading} deleteTrip={deleteTrip} />
+      {activeTab === 'routes' && (
+        <RoutesTab
+          trips={trips}
+          loading={tripsLoading}
+          deleteTrip={deleteTrip}
+          updateTrip={updateTrip}
+        />
       )}
       {activeTab === 'cars' && <CarsTab />}
       {activeTab === 'export' && <ExportTab trips={trips} loading={tripsLoading} />}
