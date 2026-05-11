@@ -35,6 +35,7 @@ export default function HomePage() {
   const [tollSegments, setTollSegments] = useState<TollSegmentInput[]>([]);
   const [parkingSegments, setParkingSegments] = useState<ParkingInput[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [tripDate, setTripDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [tripName, setTripName] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -158,6 +159,7 @@ export default function HomePage() {
     try {
       await saveTrip({
         name: tripName,
+        tripDate,
         totalDistanceKm: result.totalDistanceKm,
         fuelCost: result.fuelCost,
         tollCost: result.tollCost,
@@ -184,21 +186,15 @@ export default function HomePage() {
   const handleExportCsv = () => {
     if (!result || !selectedCar) return;
 
-    const today = new Date().toLocaleDateString('ja-JP', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-    });
-
-    // 経路文字列
+    const dateLabel = tripDate.replace(/-/g, '/'); // YYYY/MM/DD
     const route = resultWaypoints.map((w) => w.place_name).join(' → ');
-
-    // 経由高速道路
     const highways = tollSegments.length > 0
       ? tollSegments.map((s) => `${s.from_ic}→${s.to_ic}`).join('、')
       : '−';
 
     const rows: string[][] = [
       ['日付', '旅行名', '経路（経由地）', '経由高速道路', 'ガソリン代（円）', '高速道路料金（円）', '駐車場代（円）', '合計（円）'],
-      [today, tripName, route, highways, String(result.fuelCost), String(result.tollCost), String(result.parkingCost), String(result.totalCost)],
+      [dateLabel, tripName, route, highways, String(result.fuelCost), String(result.tollCost), String(result.parkingCost), String(result.totalCost)],
     ];
 
     const csvContent =
@@ -211,7 +207,7 @@ export default function HomePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = tripName ? `${tripName}.csv` : `交通費明細_${today}.csv`;
+    a.download = tripName ? `${tripName}.csv` : `交通費明細_${tripDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -337,6 +333,8 @@ export default function HomePage() {
           parkingSegments={parkingSegments}
           carName={selectedCar.name}
           gasPrice={gasPrice}
+          tripDate={tripDate}
+          onTripDateChange={setTripDate}
           tripName={tripName}
           onTripNameChange={setTripName}
           onSave={handleSave}

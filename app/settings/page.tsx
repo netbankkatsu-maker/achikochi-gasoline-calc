@@ -21,6 +21,18 @@ function formatDateShort(iso: string): string {
   });
 }
 
+/** trip_date (YYYY-MM-DD) があればそれを優先、なければ created_at を使う */
+function tripDisplayDate(trip: Trip): string {
+  return trip.trip_date
+    ? trip.trip_date.replace(/-/g, '/')
+    : formatDateShort(trip.created_at);
+}
+
+function tripDisplayDateLong(trip: Trip): string {
+  const src = trip.trip_date ?? trip.created_at;
+  return formatDate(src);
+}
+
 // ─── 経路カード ──────────────────────────────────────────
 function RouteCard({
   trip,
@@ -63,7 +75,7 @@ function RouteCard({
         >
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-gray-800 truncate text-sm">{displayName}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{formatDate(trip.created_at)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{tripDisplayDateLong(trip)}</p>
           </div>
           <span className="text-sm font-bold text-blue-600 flex-shrink-0">
             {formatCurrency(trip.total_cost)}
@@ -495,7 +507,7 @@ function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
         ? tolls.map((s) => `${s.from_ic}→${s.to_ic}`).join('、')
         : '−';
       rows.push([
-        formatDateShort(trip.created_at),
+        tripDisplayDate(trip),
         trip.name ?? '',
         route,
         highways,
@@ -529,7 +541,7 @@ function ExportTab({ trips, loading }: { trips: Trip[]; loading: boolean }) {
         ? `${wps[0].place_name}→${wps[wps.length - 1].place_name}`
         : (trip.name ?? '移動');
       const label = trip.name ? `${trip.name}（${route}）` : route;
-      const date = formatDateShort(trip.created_at);
+      const date = tripDisplayDate(trip);
 
       // ガソリン代
       rows.push([date, `ガソリン代（${label}）`, String(trip.fuel_cost)]);

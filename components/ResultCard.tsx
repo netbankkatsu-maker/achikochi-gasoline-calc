@@ -9,6 +9,8 @@ type Props = {
   parkingSegments: ParkingInput[];
   carName: string;
   gasPrice: number;
+  tripDate: string;
+  onTripDateChange: (date: string) => void;
   tripName: string;
   onTripNameChange: (name: string) => void;
   onSave: () => void;
@@ -22,6 +24,8 @@ export default function ResultCard({
   parkingSegments,
   carName,
   gasPrice,
+  tripDate,
+  onTripDateChange,
   tripName,
   onTripNameChange,
   onSave,
@@ -90,6 +94,15 @@ export default function ResultCard({
 
         {/* 保存・出力 */}
         <div className="space-y-2 pt-2 border-t border-gray-100">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">📅 移動日</label>
+            <input
+              type="date"
+              value={tripDate}
+              onChange={(e) => onTripDateChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            />
+          </div>
           <input
             type="text"
             value={tripName}

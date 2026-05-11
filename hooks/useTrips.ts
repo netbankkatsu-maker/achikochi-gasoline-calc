@@ -8,6 +8,7 @@ function parseTrip(raw: Record<string, unknown>): Trip {
   return {
     id: raw.id as string,
     name: raw.name as string | null,
+    trip_date: (raw.trip_date as string | null) ?? null,
     total_distance_km: parseFloat(raw.total_distance_km as string),
     fuel_cost: Number(raw.fuel_cost),
     toll_cost: Number(raw.toll_cost),
@@ -70,6 +71,7 @@ export function useTrips() {
 
   const saveTrip = async (params: {
     name: string;
+    tripDate: string;
     totalDistanceKm: number;
     fuelCost: number;
     tollCost: number;
@@ -87,6 +89,7 @@ export function useTrips() {
       .from('trips')
       .insert({
         name: params.name || null,
+        trip_date: params.tripDate || null,
         total_distance_km: params.totalDistanceKm,
         fuel_cost: params.fuelCost,
         toll_cost: params.tollCost,

@@ -31,6 +31,7 @@ export type ParkingSegment = {
 export type Trip = {
   id: string;
   name: string | null;
+  trip_date: string | null; // YYYY-MM-DD
   total_distance_km: number;
   fuel_cost: number;
   toll_cost: number;
